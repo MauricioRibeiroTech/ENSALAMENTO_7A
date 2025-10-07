@@ -87,7 +87,7 @@ with st.sidebar:
             st.rerun()
 
 # --- ÁREA PRINCIPAL PARA EXIBIR O MAPA DA SALA ---
-st.title("🏫 Mapa da Sala de Aula Interativo do 7º Ano A do HD🎨")
+st.title("Ensalamento Interativo do 7º Ano A do HD")
 st.markdown("Adicione os alunos na barra lateral e clique no botão abaixo para criar um layout organizado por grupos!")
 
 if st.button("✨ Gerar / Organizar Ensalamento por Grupos!", type="primary", use_container_width=True):
