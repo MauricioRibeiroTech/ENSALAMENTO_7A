@@ -1,6 +1,8 @@
 import streamlit as st
-from streamlit_js_eval import streamlit_js_eval
 import base64
+from fpdf import FPDF
+import requests
+import os
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(
@@ -25,8 +27,54 @@ if 'students' not in st.session_state:
     st.session_state.students = []
 if 'map_generated' not in st.session_state:
     st.session_state.map_generated = False
-if 'image_data' not in st.session_state:
-    st.session_state.image_data = None
+
+# --- FUNÇÃO DE GERAÇÃO DE PDF ---
+def create_pdf_report(students_list):
+    """Gera um relatório PDF elegante com a lista de alunos por grupo."""
+    
+    # Baixar uma fonte que suporte emojis (essencial para funcionar na nuvem)
+    font_url = "https://github.com/google/fonts/raw/main/apache/dejavusans/DejaVuSans.ttf"
+    font_file = "DejaVuSans.ttf"
+    try:
+        if not os.path.exists(font_file):
+            response = requests.get(font_url)
+            response.raise_for_status()
+            with open(font_file, "wb") as f:
+                f.write(response.content)
+    except requests.exceptions.RequestException as e:
+        st.error(f"Falha ao baixar a fonte necessária para o PDF: {e}")
+        return None
+
+    pdf = FPDF()
+    pdf.add_page()
+    
+    # Adicionar a fonte baixada ao PDF
+    pdf.add_font('DejaVu', '', font_file, uni=True)
+    
+    # Título do Documento
+    pdf.set_font('DejaVu', size=20)
+    pdf.cell(0, 15, "Ensalamento Interativo - 7º Ano A do HD", new_x="LMARGIN", new_y="NEXT", align='C')
+    pdf.ln(10)
+
+    # Loop pelos grupos e alunos
+    for group_id, config in GROUP_CONFIG.items():
+        students_in_group = [s for s in students_list if s['group'] == group_id]
+        
+        if students_in_group:
+            # Título do Grupo
+            pdf.set_font('DejaVu', size=16)
+            pdf.cell(0, 12, f"Grupo {group_id} {config['emoji']}", new_x="LMARGIN", new_y="NEXT")
+            
+            # Lista de Alunos no Grupo
+            pdf.set_font('DejaVu', size=12)
+            for student in students_in_group:
+                student_emoji = "👦" if student['gender'] == "Menino" else "👧"
+                pdf.cell(0, 8, f"    {student_emoji}  {student['name']}", new_x="LMARGIN", new_y="NEXT")
+            
+            pdf.ln(8) # Espaço entre os grupos
+        
+    return pdf.output(dest='S').encode('latin-1')
+
 
 # --- FUNÇÕES AUXILIARES ---
 def add_student(name, group, gender):
@@ -37,14 +85,12 @@ def add_student(name, group, gender):
             st.session_state.students.append({"name": name, "group": group, "gender": gender})
             st.sidebar.success(f"'{name}' adicionado ao Grupo {group}!")
             st.session_state.map_generated = False
-            st.session_state.image_data = None
     else:
         st.sidebar.error("Por favor, insira o nome do aluno.")
 
 def clear_students():
     st.session_state.students = []
     st.session_state.map_generated = False
-    st.session_state.image_data = None
 
 # --- BARRA LATERAL (SIDEBAR) ---
 with st.sidebar:
@@ -87,10 +133,10 @@ if st.button("✨ Gerar / Organizar Ensalamento", type="primary", use_container_
         st.error("Você precisa adicionar pelo menos um aluno para gerar o mapa da sala!")
     else:
         st.session_state.map_generated = True
-        st.session_state.image_data = None
 
 if st.session_state.map_generated:
     st.subheader("Aqui está a turma organizada por grupos!")
+    # A visualização do mapa na tela continua a mesma
     st.markdown('<div id="classroom-map" style="background-color: white; padding: 20px; border-radius: 10px;">', unsafe_allow_html=True)
     main_cols = st.columns(2, gap="large")
     for i, (group_id, group_info_config) in enumerate(GROUP_CONFIG.items()):
@@ -115,75 +161,19 @@ if st.session_state.map_generated:
     st.markdown('</div>', unsafe_allow_html=True)
     st.divider()
 
-    # --- LÓGICA DE DOWNLOAD APRIMORADA ---
-    if st.button("🖨️ Preparar Imagem para Download", use_container_width=True):
-        with st.spinner("Gerando imagem... por favor, aguarde."):
-            js_code = """
-                new Promise((resolve) => {
-                    try {
-                        const runCapture = () => {
-                            const mapElement = document.getElementById('classroom-map');
-                            if (!mapElement) {
-                                resolve({ success: false, error: 'Elemento do mapa não foi encontrado.' });
-                                return;
-                            }
-                            // Aumenta o tempo de espera para garantir que tudo seja renderizado
-                            setTimeout(() => {
-                                html2canvas(mapElement, {
-                                    useCORS: true,
-                                    scale: 3,
-                                    backgroundColor: '#ffffff'
-                                }).then(canvas => {
-                                    resolve({ success: true, data: canvas.toDataURL('image/png') });
-                                }).catch(err => {
-                                    resolve({ success: false, error: 'Erro no html2canvas: ' + err.toString() });
-                                });
-                            }, 1500);
-                        };
-
-                        // Verifica se a biblioteca html2canvas já está carregada
-                        if (typeof html2canvas === 'function') {
-                            runCapture();
-                        } else {
-                            const script = document.createElement('script');
-                            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-                            document.head.appendChild(script);
-                            script.onload = runCapture;
-                            script.onerror = () => {
-                                resolve({ success: false, error: 'Falha ao carregar script externo (html2canvas). Verifique a conexão ou possíveis bloqueadores de anúncio.' });
-                            };
-                        }
-                    } catch (e) {
-                        resolve({ success: false, error: 'Erro inesperado no JavaScript: ' + e.toString() });
-                    }
-                })
-            """
-            js_result = streamlit_js_eval(js_expressions=js_code, key="image_generation_robust")
-        
-        if js_result and isinstance(js_result, dict) and js_result.get("success"):
-            st.session_state.image_data = js_result.get("data")
-        else:
-            st.session_state.image_data = None
-            error_message = "Causa desconhecida."
-            if js_result and isinstance(js_result, dict):
-                error_message = js_result.get("error", "Não foi possível obter a razão do erro.")
-            st.error(f"Falha ao gerar a imagem. Detalhe: {error_message}")
-        st.rerun()
-
-    if st.session_state.image_data:
-        try:
-            b64_data = st.session_state.image_data.split(",")[1]
-            image_bytes = base64.b64decode(b64_data)
-            st.download_button(
-                label="✅ Baixar Imagem Agora",
-                data=image_bytes,
-                file_name="mapa_de_sala.png",
-                mime="image/png",
-                use_container_width=True,
-                type="primary"
-            )
-        except Exception as e:
-            st.error(f"Ocorreu um erro ao preparar a imagem para download: {e}")
+    # --- LÓGICA DE DOWNLOAD DE PDF ---
+    with st.spinner("Preparando PDF..."):
+        pdf_data = create_pdf_report(st.session_state.students)
+    
+    if pdf_data:
+        st.download_button(
+            label="📄 Baixar Relatório PDF",
+            data=pdf_data,
+            file_name="ensalamento_turma.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+            type="primary"
+        )
 else:
     st.info("Clique no botão 'Gerar Ensalamento' para visualizar o mapa.")
 
