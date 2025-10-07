@@ -1,5 +1,6 @@
 import streamlit as st
 from streamlit_js_eval import streamlit_js_eval
+import base64
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(
@@ -24,6 +25,9 @@ if 'students' not in st.session_state:
     st.session_state.students = []
 if 'map_generated' not in st.session_state:
     st.session_state.map_generated = False
+# NOVO ESTADO: Para armazenar a imagem gerada pelo JavaScript
+if 'image_data' not in st.session_state:
+    st.session_state.image_data = None
 
 # --- FUNÇÕES AUXILIARES ---
 def add_student(name, group, gender):
@@ -40,6 +44,7 @@ def add_student(name, group, gender):
 def clear_students():
     st.session_state.students = []
     st.session_state.map_generated = False
+    st.session_state.image_data = None # Limpa a imagem também
 
 # --- BARRA LATERAL (SIDEBAR) ---
 with st.sidebar:
@@ -57,7 +62,6 @@ with st.sidebar:
                 format_func=lambda g: f"Grupo {g} {GROUP_CONFIG[g]['emoji']}"
             )
         with col2:
-            # NOVO CAMPO: Seletor de gênero
             student_gender = st.selectbox("Gênero", ["Menino", "Menina"])
 
         if st.form_submit_button("Adicionar à Turma"):
@@ -73,12 +77,10 @@ with st.sidebar:
             students_in_group = [s['name'] for s in st.session_state.students if s['group'] == group_id]
             if students_in_group:
                 with st.expander(f"**Grupo {group_id} {config['emoji']}** ({len(students_in_group)} alunos)"):
-                    # Exibe o nome e o gênero na lista da barra lateral
                     for student_data in st.session_state.students:
                         if student_data['group'] == group_id:
                             emoji = "👦" if student_data['gender'] == "Menino" else "👧"
                             st.write(f"- {student_data['name']} {emoji}")
-
 
     if st.session_state.students:
         st.divider()
@@ -95,27 +97,23 @@ if st.button("✨ Gerar / Organizar Ensalamento por Grupos!", type="primary", us
         st.error("Você precisa adicionar pelo menos um aluno para gerar o mapa da sala!")
     else:
         st.session_state.map_generated = True
+        st.session_state.image_data = None # Reseta a imagem antiga ao gerar um novo mapa
 
 if st.session_state.map_generated:
     st.subheader("Aqui está a turma organizada por grupos!")
     
+    # O contêiner do mapa que será capturado
     st.markdown('<div id="classroom-map" style="background-color: white; padding: 20px; border-radius: 10px;">', unsafe_allow_html=True)
 
     main_cols = st.columns(2, gap="large")
-    
     for i, (group_id, group_info_config) in enumerate(GROUP_CONFIG.items()):
-        
         target_col = main_cols[i % 2]
-        
         with target_col:
             students_in_group = [s for s in st.session_state.students if s['group'] == group_id]
-            
             if students_in_group:
                 st.markdown(f"<h5><span style='color:{group_info_config['color']};'>Grupo {group_id} {group_info_config['emoji']}</span></h5>", unsafe_allow_html=True)
-
                 num_columns = 3
                 num_rows = (len(students_in_group) + num_columns - 1) // num_columns
-                
                 for row in range(num_rows):
                     desk_cols = st.columns(num_columns)
                     for col_index in range(num_columns):
@@ -123,29 +121,11 @@ if st.session_state.map_generated:
                         if student_index < len(students_in_group):
                             student = students_in_group[student_index]
                             group_info = GROUP_CONFIG[student['group']]
-                            
-                            # ALTERAÇÃO: Define o emoji com base no gênero do aluno
                             student_emoji = "👦" if student['gender'] == "Menino" else "👧"
-                            
                             with desk_cols[col_index]:
                                 st.markdown(
                                     f"""
-                                    <div style="
-                                        background-color: {group_info['color']};
-                                        border-radius: 8px;
-                                        padding: 15px 10px;
-                                        text-align: center;
-                                        color: white;
-                                        font-family: 'sans-serif';
-                                        min-height: 120px;
-                                        display: flex;
-                                        flex-direction: column;
-                                        justify-content: center;
-                                        align-items: center;
-                                        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-                                        border-top: 15px solid rgba(0,0,0,0.2);
-                                        margin-bottom: 10px;
-                                    ">
+                                    <div style="background-color: {group_info['color']}; border-radius: 8px; padding: 15px 10px; text-align: center; color: white; font-family: 'sans-serif'; min-height: 120px; display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-top: 15px solid rgba(0,0,0,0.2); margin-bottom: 10px;">
                                         <p style="font-size: 2.5em; margin: 0; line-height: 1;">{student_emoji}</p>
                                         <h6 style="margin-top: 5px; margin-bottom: 0px; font-weight: bold; word-wrap: break-word;">{student['name']}</h6>
                                     </div>
@@ -153,45 +133,64 @@ if st.session_state.map_generated:
                                     unsafe_allow_html=True
                                 )
                 st.markdown("<br>", unsafe_allow_html=True)
-
     st.markdown('</div>', unsafe_allow_html=True)
     
     st.divider()
-    if st.button("🖨️ Salvar Mapa como Imagem (PNG)", use_container_width=True):
-        streamlit_js_eval(js_expressions="""
-            const mapElement = document.getElementById('classroom-map');
 
-            const runHtml2Canvas = () => {
-                // Adiciona um pequeno atraso para garantir que todos os estilos sejam aplicados antes da captura
-                setTimeout(() => {
-                    html2canvas(mapElement, {
-                        useCORS: true,
-                        scale: 3, // Escala aumentada para maior resolução de impressão
-                        backgroundColor: '#ffffff' // Garante um fundo branco sólido
-                    }).then(canvas => {
-                        const link = document.createElement('a');
-                        link.download = 'mapa_de_sala.png';
-                        link.href = canvas.toDataURL('image/png');
-                        link.click();
-                    });
-                }, 500); // Atraso de 500ms
-            };
+    # --- NOVA LÓGICA DE DOWNLOAD ---
 
-            if (typeof html2canvas === 'function') {
-                runHtml2Canvas();
-            } else {
-                const scriptId = 'html2canvas-script';
-                if (!document.getElementById(scriptId)) {
+    # 1. Botão para preparar a imagem
+    if st.button("🖨️ Preparar Imagem para Download", use_container_width=True):
+        # Chama o JS, que agora RETORNA o dado da imagem em base64
+        image_data = streamlit_js_eval(js_expressions="""
+            new Promise((resolve, reject) => {
+                const mapElement = document.getElementById('classroom-map');
+                
+                const runHtml2Canvas = () => {
+                    setTimeout(() => {
+                        html2canvas(mapElement, {
+                            useCORS: true,
+                            scale: 3,
+                            backgroundColor: '#ffffff'
+                        }).then(canvas => {
+                            // Em vez de clicar, resolve a Promise com o dado
+                            resolve(canvas.toDataURL('image/png'));
+                        }).catch(reject);
+                    }, 500);
+                };
+
+                if (typeof html2canvas === 'function') {
+                    runHtml2Canvas();
+                } else {
                     const script = document.createElement('script');
-                    script.id = scriptId;
                     script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
                     document.head.appendChild(script);
-                    
-                    script.onload = runHtml2Canvas; 
+                    script.onload = runHtml2Canvas;
                 }
-            }
+            })
         """)
-        st.success("Download iniciado! Verifique a pasta de downloads do seu navegador.")
+        # Armazena o dado retornado no estado da sessão
+        if image_data:
+            st.session_state.image_data = image_data
+            st.rerun() # Recarrega o script para mostrar o botão de download
+
+    # 2. Se a imagem foi preparada, mostra o botão de download
+    if st.session_state.image_data:
+        # Decodifica o dado base64 para bytes, que é o formato que o botão de download precisa
+        try:
+            b64_data = st.session_state.image_data.split(",")[1]
+            image_bytes = base64.b64decode(b64_data)
+            
+            st.download_button(
+                label="✅ Baixar Imagem Agora",
+                data=image_bytes,
+                file_name="mapa_de_sala.png",
+                mime="image/png",
+                use_container_width=True,
+                type="primary"
+            )
+        except Exception as e:
+            st.error(f"Ocorreu um erro ao preparar a imagem para download: {e}")
+            
 else:
     st.info("Clique no botão 'Gerar Ensalamento' para visualizar o mapa.")
-
