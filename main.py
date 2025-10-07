@@ -38,6 +38,7 @@ def add_student(name, group, gender):
             st.session_state.students.append({"name": name, "group": group, "gender": gender})
             st.sidebar.success(f"'{name}' adicionado ao Grupo {group}!")
             st.session_state.map_generated = False
+            st.session_state.image_data = None
     else:
         st.sidebar.error("Por favor, insira o nome do aluno.")
 
@@ -137,46 +138,57 @@ if st.session_state.map_generated:
     
     st.divider()
 
-    # --- NOVA LÓGICA DE DOWNLOAD ---
+    # --- LÓGICA DE DOWNLOAD CORRIGIDA E ROBUSTA ---
 
     # 1. Botão para preparar a imagem
     if st.button("🖨️ Preparar Imagem para Download", use_container_width=True):
-        # Chama o JS, que agora RETORNA o dado da imagem em base64
-        image_data = streamlit_js_eval(js_expressions="""
-            new Promise((resolve, reject) => {
-                const mapElement = document.getElementById('classroom-map');
-                
-                const runHtml2Canvas = () => {
-                    setTimeout(() => {
-                        html2canvas(mapElement, {
-                            useCORS: true,
-                            scale: 3,
-                            backgroundColor: '#ffffff'
-                        }).then(canvas => {
-                            // Em vez de clicar, resolve a Promise com o dado
-                            resolve(canvas.toDataURL('image/png'));
-                        }).catch(reject);
-                    }, 500);
-                };
+        with st.spinner("Gerando imagem... por favor, aguarde."):
+            # Chama o JS, que agora RETORNA o dado da imagem em base64
+            image_data = streamlit_js_eval(js_expressions="""
+                new Promise((resolve, reject) => {
+                    const mapElement = document.getElementById('classroom-map');
+                    
+                    if (!mapElement) {
+                        reject('Elemento do mapa não encontrado.');
+                        return;
+                    }
+                    
+                    const runHtml2Canvas = () => {
+                        setTimeout(() => {
+                            html2canvas(mapElement, {
+                                useCORS: true,
+                                scale: 3,
+                                backgroundColor: '#ffffff'
+                            }).then(canvas => {
+                                resolve(canvas.toDataURL('image/png'));
+                            }).catch(err => {
+                                reject('Erro no html2canvas: ' + err.toString());
+                            });
+                        }, 500);
+                    };
 
-                if (typeof html2canvas === 'function') {
-                    runHtml2Canvas();
-                } else {
-                    const script = document.createElement('script');
-                    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-                    document.head.appendChild(script);
-                    script.onload = runHtml2Canvas;
-                }
-            })
-        """)
-        # Armazena o dado retornado no estado da sessão
+                    if (typeof html2canvas === 'function') {
+                        runHtml2Canvas();
+                    } else {
+                        const script = document.createElement('script');
+                        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+                        document.head.appendChild(script);
+                        script.onload = runHtml2Canvas;
+                        script.onerror = () => {
+                            reject('Falha ao carregar o script do html2canvas.');
+                        };
+                    }
+                })
+            """)
+        
         if image_data:
             st.session_state.image_data = image_data
-            st.rerun() # Recarrega o script para mostrar o botão de download
+            st.rerun() 
+        else:
+            st.error("Falha ao gerar a imagem. Por favor, tente novamente.")
 
     # 2. Se a imagem foi preparada, mostra o botão de download
     if st.session_state.image_data:
-        # Decodifica o dado base64 para bytes, que é o formato que o botão de download precisa
         try:
             b64_data = st.session_state.image_data.split(",")[1]
             image_bytes = base64.b64decode(b64_data)
@@ -194,3 +206,4 @@ if st.session_state.map_generated:
             
 else:
     st.info("Clique no botão 'Gerar Ensalamento' para visualizar o mapa.")
+
