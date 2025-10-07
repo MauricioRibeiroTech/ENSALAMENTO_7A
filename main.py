@@ -138,58 +138,68 @@ if st.session_state.map_generated:
     
     st.divider()
 
-    # --- LÓGICA DE DOWNLOAD CORRIGIDA E ROBUSTA ---
+    # --- LÓGICA DE DOWNLOAD CORRIGIDA COM MELHOR FEEDBACK DE ERRO ---
 
     # 1. Botão para preparar a imagem
     if st.button("🖨️ Preparar Imagem para Download", use_container_width=True):
         with st.spinner("Gerando imagem... por favor, aguarde."):
-            # Chama o JS, que agora RETORNA o dado da imagem em base64
-            image_data = streamlit_js_eval(js_expressions="""
-                new Promise((resolve, reject) => {
-                    const mapElement = document.getElementById('classroom-map');
-                    
-                    if (!mapElement) {
-                        reject('Elemento do mapa não encontrado.');
-                        return;
-                    }
-                    
-                    const runHtml2Canvas = () => {
-                        setTimeout(() => {
-                            html2canvas(mapElement, {
-                                useCORS: true,
-                                scale: 3,
-                                backgroundColor: '#ffffff'
-                            }).then(canvas => {
-                                resolve(canvas.toDataURL('image/png'));
-                            }).catch(err => {
-                                reject('Erro no html2canvas: ' + err.toString());
-                            });
-                        }, 500);
-                    };
-
-                    if (typeof html2canvas === 'function') {
-                        runHtml2Canvas();
-                    } else {
-                        const script = document.createElement('script');
-                        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-                        document.head.appendChild(script);
-                        script.onload = runHtml2Canvas;
-                        script.onerror = () => {
-                            reject('Falha ao carregar o script do html2canvas.');
+            # JavaScript aprimorado: sempre retorna um objeto com status de sucesso/falha
+            js_code = """
+                new Promise((resolve) => {
+                    try {
+                        const mapElement = document.getElementById('classroom-map');
+                        if (!mapElement) {
+                            resolve({ success: false, error: 'Elemento do mapa não foi encontrado.' });
+                            return;
+                        }
+                        
+                        const runHtml2Canvas = () => {
+                            setTimeout(() => {
+                                html2canvas(mapElement, {
+                                    useCORS: true,
+                                    scale: 3,
+                                    backgroundColor: '#ffffff'
+                                }).then(canvas => {
+                                    resolve({ success: true, data: canvas.toDataURL('image/png') });
+                                }).catch(err => {
+                                    resolve({ success: false, error: 'Erro no html2canvas: ' + err.toString() });
+                                });
+                            }, 1000); // Aumentado para 1 segundo para dar tempo de renderizar
                         };
+
+                        if (typeof html2canvas === 'function') {
+                            runHtml2Canvas();
+                        } else {
+                            const script = document.createElement('script');
+                            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+                            document.head.appendChild(script);
+                            script.onload = runHtml2Canvas;
+                            script.onerror = () => {
+                                resolve({ success: false, error: 'Falha ao carregar script externo. Verifique a conexão ou bloqueadores.' });
+                            };
+                        }
+                    } catch (e) {
+                        resolve({ success: false, error: 'Erro inesperado no JavaScript: ' + e.toString() });
                     }
                 })
-            """)
+            """
+            js_result = streamlit_js_eval(js_expressions=js_code, key="image_generation")
         
-        if image_data:
-            st.session_state.image_data = image_data
+        # Verifica o resultado retornado pelo JavaScript
+        if js_result and isinstance(js_result, dict) and js_result.get("success"):
+            st.session_state.image_data = js_result.get("data")
             st.rerun() 
         else:
-            st.error("Falha ao gerar a imagem. Por favor, tente novamente.")
+            # Exibe a mensagem de erro específica vinda do JavaScript
+            error_message = "Erro desconhecido."
+            if js_result and isinstance(js_result, dict):
+                error_message = js_result.get("error", "Não foi possível obter a razão do erro.")
+            st.error(f"Falha ao gerar a imagem. Detalhe: {error_message}")
 
     # 2. Se a imagem foi preparada, mostra o botão de download
     if st.session_state.image_data:
         try:
+            # Extrai os dados da imagem em base64
             b64_data = st.session_state.image_data.split(",")[1]
             image_bytes = base64.b64decode(b64_data)
             
