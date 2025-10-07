@@ -32,7 +32,6 @@ if 'map_generated' not in st.session_state:
 def create_pdf_report(students_list):
     """Gera um relatório PDF elegante com a lista de alunos por grupo, sem emojis."""
     
-    # --- CORREÇÃO APLICADA AQUI ---
     # Reintroduzimos o download de uma fonte Unicode para suportar acentos em nomes.
     # Este novo URL é mais estável.
     font_url = "https://github.com/matplotlib/matplotlib/raw/main/lib/matplotlib/mpl-data/fonts/ttf/DejaVuSans.ttf"
@@ -74,8 +73,10 @@ def create_pdf_report(students_list):
                 pdf.cell(0, 8, f"  •  {student['name']}", new_x="LMARGIN", new_y="NEXT")
             
             pdf.ln(8) # Espaço entre os grupos
-        
-    return pdf.output(dest='S').encode('latin-1')
+    
+    # --- CORREÇÃO APLICADA AQUI ---
+    # A saída com uma fonte Unicode já é um objeto de bytes, então .encode() não é necessário e causa o erro.
+    return pdf.output(dest='S')
 
 
 # --- FUNÇÕES AUXILIARES ---
