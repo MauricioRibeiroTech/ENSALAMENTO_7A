@@ -30,48 +30,31 @@ if 'map_generated' not in st.session_state:
 
 # --- FUNÇÃO DE GERAÇÃO DE PDF ---
 def create_pdf_report(students_list):
-    """Gera um relatório PDF elegante com a lista de alunos por grupo."""
+    """Gera um relatório PDF elegante com a lista de alunos por grupo, sem emojis."""
     
-    # --- CORREÇÃO AQUI ---
-    # O URL antigo estava quebrado (erro 404). Este é um link novo e funcional para a mesma fonte.
-    font_url = "https://github.com/web-platform-tests/wpt/raw/master/fonts/dejavu/DejaVuSans.ttf"
-    font_file = "DejaVuSans.ttf"
-    try:
-        # A lógica para baixar e salvar o arquivo permanece a mesma.
-        if not os.path.exists(font_file):
-            response = requests.get(font_url)
-            response.raise_for_status()
-            with open(font_file, "wb") as f:
-                f.write(response.content)
-    except requests.exceptions.RequestException as e:
-        st.error(f"Falha ao baixar a fonte necessária para o PDF: {e}")
-        return None
-
     pdf = FPDF()
     pdf.add_page()
     
-    # Adicionar a fonte baixada ao PDF
-    pdf.add_font('DejaVu', '', font_file, uni=True)
-    
+    # Usa fontes padrão do PDF, eliminando a necessidade de download.
     # Título do Documento
-    pdf.set_font('DejaVu', size=20)
+    pdf.set_font('Helvetica', 'B', 20)
     pdf.cell(0, 15, "Ensalamento Interativo - 7º Ano A do HD", new_x="LMARGIN", new_y="NEXT", align='C')
-    pdf.ln(10)
+    pdf.ln(15)
 
     # Loop pelos grupos e alunos
     for group_id, config in GROUP_CONFIG.items():
         students_in_group = [s for s in students_list if s['group'] == group_id]
         
         if students_in_group:
-            # Título do Grupo
-            pdf.set_font('DejaVu', size=16)
-            pdf.cell(0, 12, f"Grupo {group_id} {config['emoji']}", new_x="LMARGIN", new_y="NEXT")
+            # Título do Grupo (sem emoji)
+            pdf.set_font('Helvetica', 'B', 16)
+            pdf.cell(0, 12, f"Grupo {group_id}", new_x="LMARGIN", new_y="NEXT")
             
-            # Lista de Alunos no Grupo
-            pdf.set_font('DejaVu', size=12)
+            # Lista de Alunos no Grupo (formato elegante, sem emoji)
+            pdf.set_font('Helvetica', '', 12)
             for student in students_in_group:
-                student_emoji = "👦" if student['gender'] == "Menino" else "👧"
-                pdf.cell(0, 8, f"    {student_emoji}  {student['name']}", new_x="LMARGIN", new_y="NEXT")
+                # Usando um marcador de lista para um visual limpo
+                pdf.cell(0, 8, f"  •  {student['name']}", new_x="LMARGIN", new_y="NEXT")
             
             pdf.ln(8) # Espaço entre os grupos
         
