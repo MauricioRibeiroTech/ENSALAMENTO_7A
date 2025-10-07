@@ -32,10 +32,12 @@ if 'map_generated' not in st.session_state:
 def create_pdf_report(students_list):
     """Gera um relatório PDF elegante com a lista de alunos por grupo."""
     
-    # Baixar uma fonte que suporte emojis (essencial para funcionar na nuvem)
-    font_url = "https://github.com/google/fonts/raw/main/apache/dejavusans/DejaVuSans.ttf"
+    # --- CORREÇÃO AQUI ---
+    # O URL antigo estava quebrado (erro 404). Este é um link novo e funcional para a mesma fonte.
+    font_url = "https://github.com/web-platform-tests/wpt/raw/master/fonts/dejavu/DejaVuSans.ttf"
     font_file = "DejaVuSans.ttf"
     try:
+        # A lógica para baixar e salvar o arquivo permanece a mesma.
         if not os.path.exists(font_file):
             response = requests.get(font_url)
             response.raise_for_status()
