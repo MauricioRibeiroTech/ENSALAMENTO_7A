@@ -1,7 +1,4 @@
 import streamlit as st
-import base64
-from fpdf import FPDF
-import requests
 import os
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
@@ -28,59 +25,9 @@ if 'students' not in st.session_state:
 if 'map_generated' not in st.session_state:
     st.session_state.map_generated = False
 
-# --- FUNÇÃO DE GERAÇÃO DE PDF ---
-def create_pdf_report(students_list):
-    """Gera um relatório PDF elegante com a lista de alunos por grupo, sem emojis."""
-    
-    # Reintroduzimos o download de uma fonte Unicode para suportar acentos em nomes.
-    # Este novo URL é mais estável.
-    font_url = "https://github.com/matplotlib/matplotlib/raw/main/lib/matplotlib/mpl-data/fonts/ttf/DejaVuSans.ttf"
-    font_file = "DejaVuSans.ttf"
-    try:
-        if not os.path.exists(font_file):
-            response = requests.get(font_url)
-            response.raise_for_status()
-            with open(font_file, "wb") as f:
-                f.write(response.content)
-    except requests.exceptions.RequestException as e:
-        st.error(f"Falha ao baixar a fonte necessária para o PDF: {e}")
-        return None
-
-    pdf = FPDF()
-    pdf.add_page()
-    
-    # Adicionar e usar a fonte que suporta caracteres especiais (Unicode).
-    pdf.add_font('DejaVu', '', font_file, uni=True)
-    
-    # Título do Documento
-    pdf.set_font('DejaVu', size=20)
-    pdf.cell(0, 15, "Ensalamento Interativo - 7º Ano A do HD", new_x="LMARGIN", new_y="NEXT", align='C')
-    pdf.ln(15)
-
-    # Loop pelos grupos e alunos
-    for group_id, config in GROUP_CONFIG.items():
-        students_in_group = [s for s in students_list if s['group'] == group_id]
-        
-        if students_in_group:
-            # Título do Grupo (sem emoji)
-            pdf.set_font('DejaVu', size=16)
-            pdf.cell(0, 12, f"Grupo {group_id}", new_x="LMARGIN", new_y="NEXT")
-            
-            # Lista de Alunos no Grupo (formato elegante, sem emoji)
-            pdf.set_font('DejaVu', size=12)
-            for student in students_in_group:
-                # Usando um marcador de lista para um visual limpo
-                pdf.cell(0, 8, f"  •  {student['name']}", new_x="LMARGIN", new_y="NEXT")
-            
-            pdf.ln(8) # Espaço entre os grupos
-    
-    # --- CORREÇÃO APLICADA AQUI ---
-    # A saída com uma fonte Unicode já é um objeto de bytes, então .encode() não é necessário e causa o erro.
-    return pdf.output(dest='S')
-
-
 # --- FUNÇÕES AUXILIARES ---
 def add_student(name, group, gender):
+    """Adiciona um novo aluno à lista de alunos no estado da sessão."""
     if name:
         if any(student['name'].lower() == name.lower() for student in st.session_state.students):
             st.sidebar.warning(f"O aluno '{name}' já está na lista.")
@@ -92,6 +39,7 @@ def add_student(name, group, gender):
         st.sidebar.error("Por favor, insira o nome do aluno.")
 
 def clear_students():
+    """Limpa a lista de todos os alunos."""
     st.session_state.students = []
     st.session_state.map_generated = False
 
@@ -162,21 +110,7 @@ if st.session_state.map_generated:
                                 st.markdown(f'<div style="background-color: {group_info["color"]}; border-radius: 8px; padding: 15px 10px; text-align: center; color: white; font-family: sans-serif; min-height: 120px; display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-top: 15px solid rgba(0,0,0,0.2); margin-bottom: 10px;"><p style="font-size: 2.5em; margin: 0; line-height: 1;">{student_emoji}</p><h6 style="margin-top: 5px; margin-bottom: 0px; font-weight: bold; word-wrap: break-word;">{student["name"]}</h6></div>', unsafe_allow_html=True)
                 st.markdown("<br>", unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
-    st.divider()
 
-    # --- LÓGICA DE DOWNLOAD DE PDF ---
-    with st.spinner("Preparando PDF..."):
-        pdf_data = create_pdf_report(st.session_state.students)
-    
-    if pdf_data:
-        st.download_button(
-            label="📄 Baixar Relatório PDF",
-            data=pdf_data,
-            file_name="ensalamento_turma.pdf",
-            mime="application/pdf",
-            use_container_width=True,
-            type="primary"
-        )
 else:
     st.info("Clique no botão 'Gerar Ensalamento' para visualizar o mapa.")
 
