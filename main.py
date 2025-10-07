@@ -25,7 +25,6 @@ if 'students' not in st.session_state:
     st.session_state.students = []
 if 'map_generated' not in st.session_state:
     st.session_state.map_generated = False
-# NOVO ESTADO: Para armazenar a imagem gerada pelo JavaScript
 if 'image_data' not in st.session_state:
     st.session_state.image_data = None
 
@@ -45,31 +44,22 @@ def add_student(name, group, gender):
 def clear_students():
     st.session_state.students = []
     st.session_state.map_generated = False
-    st.session_state.image_data = None # Limpa a imagem também
+    st.session_state.image_data = None
 
 # --- BARRA LATERAL (SIDEBAR) ---
 with st.sidebar:
     st.header("🧑‍🎓 Painel de Controle")
-
     with st.form("add_student_form", clear_on_submit=True):
         st.subheader("Adicionar Novo Aluno")
         student_name = st.text_input("Nome do Aluno", placeholder="Ex: Ana Silva")
-        
         col1, col2 = st.columns(2)
         with col1:
-            student_group = st.selectbox(
-                "Grupo",
-                options=list(GROUP_CONFIG.keys()),
-                format_func=lambda g: f"Grupo {g} {GROUP_CONFIG[g]['emoji']}"
-            )
+            student_group = st.selectbox("Grupo", options=list(GROUP_CONFIG.keys()), format_func=lambda g: f"Grupo {g} {GROUP_CONFIG[g]['emoji']}")
         with col2:
             student_gender = st.selectbox("Gênero", ["Menino", "Menina"])
-
         if st.form_submit_button("Adicionar à Turma"):
             add_student(student_name, student_group, student_gender)
-
     st.divider()
-
     st.subheader("📋 Alunos na Turma")
     if not st.session_state.students:
         st.info("Nenhum aluno foi adicionado ainda.")
@@ -82,30 +72,26 @@ with st.sidebar:
                         if student_data['group'] == group_id:
                             emoji = "👦" if student_data['gender'] == "Menino" else "👧"
                             st.write(f"- {student_data['name']} {emoji}")
-
     if st.session_state.students:
         st.divider()
         if st.button("🗑️ Limpar Todos os Alunos", use_container_width=True):
             clear_students()
             st.rerun()
 
-# --- ÁREA PRINCIPAL PARA EXIBIR O MAPA DA SALA ---
+# --- ÁREA PRINCIPAL ---
 st.title("Ensalamento Interativo do 7º Ano A do HD")
 st.markdown("Adicione os alunos na barra lateral e clique no botão abaixo para criar um layout organizado por grupos!")
 
-if st.button("✨ Gerar / Organizar Ensalamento por Grupos!", type="primary", use_container_width=True):
+if st.button("✨ Gerar / Organizar Ensalamento", type="primary", use_container_width=True):
     if not st.session_state.students:
         st.error("Você precisa adicionar pelo menos um aluno para gerar o mapa da sala!")
     else:
         st.session_state.map_generated = True
-        st.session_state.image_data = None # Reseta a imagem antiga ao gerar um novo mapa
+        st.session_state.image_data = None
 
 if st.session_state.map_generated:
     st.subheader("Aqui está a turma organizada por grupos!")
-    
-    # O contêiner do mapa que será capturado
     st.markdown('<div id="classroom-map" style="background-color: white; padding: 20px; border-radius: 10px;">', unsafe_allow_html=True)
-
     main_cols = st.columns(2, gap="large")
     for i, (group_id, group_info_config) in enumerate(GROUP_CONFIG.items()):
         target_col = main_cols[i % 2]
@@ -124,36 +110,24 @@ if st.session_state.map_generated:
                             group_info = GROUP_CONFIG[student['group']]
                             student_emoji = "👦" if student['gender'] == "Menino" else "👧"
                             with desk_cols[col_index]:
-                                st.markdown(
-                                    f"""
-                                    <div style="background-color: {group_info['color']}; border-radius: 8px; padding: 15px 10px; text-align: center; color: white; font-family: 'sans-serif'; min-height: 120px; display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-top: 15px solid rgba(0,0,0,0.2); margin-bottom: 10px;">
-                                        <p style="font-size: 2.5em; margin: 0; line-height: 1;">{student_emoji}</p>
-                                        <h6 style="margin-top: 5px; margin-bottom: 0px; font-weight: bold; word-wrap: break-word;">{student['name']}</h6>
-                                    </div>
-                                    """,
-                                    unsafe_allow_html=True
-                                )
+                                st.markdown(f'<div style="background-color: {group_info["color"]}; border-radius: 8px; padding: 15px 10px; text-align: center; color: white; font-family: sans-serif; min-height: 120px; display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-top: 15px solid rgba(0,0,0,0.2); margin-bottom: 10px;"><p style="font-size: 2.5em; margin: 0; line-height: 1;">{student_emoji}</p><h6 style="margin-top: 5px; margin-bottom: 0px; font-weight: bold; word-wrap: break-word;">{student["name"]}</h6></div>', unsafe_allow_html=True)
                 st.markdown("<br>", unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
-    
     st.divider()
 
-    # --- LÓGICA DE DOWNLOAD CORRIGIDA COM MELHOR FEEDBACK DE ERRO ---
-
-    # 1. Botão para preparar a imagem
+    # --- LÓGICA DE DOWNLOAD APRIMORADA ---
     if st.button("🖨️ Preparar Imagem para Download", use_container_width=True):
         with st.spinner("Gerando imagem... por favor, aguarde."):
-            # JavaScript aprimorado: sempre retorna um objeto com status de sucesso/falha
             js_code = """
                 new Promise((resolve) => {
                     try {
-                        const mapElement = document.getElementById('classroom-map');
-                        if (!mapElement) {
-                            resolve({ success: false, error: 'Elemento do mapa não foi encontrado.' });
-                            return;
-                        }
-                        
-                        const runHtml2Canvas = () => {
+                        const runCapture = () => {
+                            const mapElement = document.getElementById('classroom-map');
+                            if (!mapElement) {
+                                resolve({ success: false, error: 'Elemento do mapa não foi encontrado.' });
+                                return;
+                            }
+                            // Aumenta o tempo de espera para garantir que tudo seja renderizado
                             setTimeout(() => {
                                 html2canvas(mapElement, {
                                     useCORS: true,
@@ -164,18 +138,19 @@ if st.session_state.map_generated:
                                 }).catch(err => {
                                     resolve({ success: false, error: 'Erro no html2canvas: ' + err.toString() });
                                 });
-                            }, 1000); // Aumentado para 1 segundo para dar tempo de renderizar
+                            }, 1500);
                         };
 
+                        // Verifica se a biblioteca html2canvas já está carregada
                         if (typeof html2canvas === 'function') {
-                            runHtml2Canvas();
+                            runCapture();
                         } else {
                             const script = document.createElement('script');
                             script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
                             document.head.appendChild(script);
-                            script.onload = runHtml2Canvas;
+                            script.onload = runCapture;
                             script.onerror = () => {
-                                resolve({ success: false, error: 'Falha ao carregar script externo. Verifique a conexão ou bloqueadores.' });
+                                resolve({ success: false, error: 'Falha ao carregar script externo (html2canvas). Verifique a conexão ou possíveis bloqueadores de anúncio.' });
                             };
                         }
                     } catch (e) {
@@ -183,26 +158,22 @@ if st.session_state.map_generated:
                     }
                 })
             """
-            js_result = streamlit_js_eval(js_expressions=js_code, key="image_generation")
+            js_result = streamlit_js_eval(js_expressions=js_code, key="image_generation_robust")
         
-        # Verifica o resultado retornado pelo JavaScript
         if js_result and isinstance(js_result, dict) and js_result.get("success"):
             st.session_state.image_data = js_result.get("data")
-            st.rerun() 
         else:
-            # Exibe a mensagem de erro específica vinda do JavaScript
-            error_message = "Erro desconhecido."
+            st.session_state.image_data = None
+            error_message = "Causa desconhecida."
             if js_result and isinstance(js_result, dict):
                 error_message = js_result.get("error", "Não foi possível obter a razão do erro.")
             st.error(f"Falha ao gerar a imagem. Detalhe: {error_message}")
+        st.rerun()
 
-    # 2. Se a imagem foi preparada, mostra o botão de download
     if st.session_state.image_data:
         try:
-            # Extrai os dados da imagem em base64
             b64_data = st.session_state.image_data.split(",")[1]
             image_bytes = base64.b64decode(b64_data)
-            
             st.download_button(
                 label="✅ Baixar Imagem Agora",
                 data=image_bytes,
@@ -213,7 +184,6 @@ if st.session_state.map_generated:
             )
         except Exception as e:
             st.error(f"Ocorreu um erro ao preparar a imagem para download: {e}")
-            
 else:
     st.info("Clique no botão 'Gerar Ensalamento' para visualizar o mapa.")
 
