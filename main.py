@@ -1,4 +1,4 @@
-import streamlit as st
+lameimport streamlit as st
 import os
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
@@ -72,7 +72,7 @@ def create_html_report(students_list):
     </head>
     <body>
         <div class="container">
-            <h1>Relatório de Grupos - 7º Ano A do HD</h1>
+            <h1>Ensalamento Interativo - 7º Ano A do HD</h1>
             <div class="grid-container">
                 <div class="column">
     """
