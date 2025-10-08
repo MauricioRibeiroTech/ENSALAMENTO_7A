@@ -25,9 +25,86 @@ if 'students' not in st.session_state:
 if 'map_generated' not in st.session_state:
     st.session_state.map_generated = False
 
+# --- FUNÇÃO DE GERAÇÃO DE HTML ---
+def create_html_report(students_list):
+    """
+    Gera um relatório HTML elegante e imprimível com a lista de alunos por grupo.
+    Este método é robusto e não depende de bibliotecas externas complexas.
+    """
+    
+    html_content = """
+    <!DOCTYPE html>
+    <html lang="pt-BR">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Relatório de Grupos</title>
+        <style>
+            body {
+                font-family: sans-serif;
+                margin: 40px;
+                color: #333;
+            }
+            .container {
+                max-width: 800px;
+                margin: auto;
+                border: 1px solid #ddd;
+                padding: 30px;
+                border-radius: 8px;
+            }
+            h1 {
+                text-align: center;
+                color: #4a4a4a;
+                border-bottom: 2px solid #f0f0f0;
+                padding-bottom: 10px;
+            }
+            h2 {
+                color: #0056b3;
+                margin-top: 40px;
+            }
+            ul {
+                list-style-type: none;
+                padding-left: 0;
+            }
+            li {
+                background-color: #f9f9f9;
+                border: 1px solid #eee;
+                border-radius: 4px;
+                padding: 10px 15px;
+                margin-bottom: 8px;
+                font-size: 16px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>Relatório de Grupos - 7º Ano A do HD</h1>
+    """
+
+    for group_id, config in GROUP_CONFIG.items():
+        students_in_group = [s for s in students_list if s['group'] == group_id]
+        
+        if students_in_group:
+            # Título do Grupo
+            html_content += f"<h2>Grupo {group_id} {config['emoji']}</h2>"
+            html_content += "<ul>"
+            
+            # Lista de Alunos
+            for student in students_in_group:
+                student_emoji = "👦" if student['gender'] == "Menino" else "👧"
+                html_content += f"<li>{student_emoji} &nbsp; {student['name']}</li>"
+            
+            html_content += "</ul>"
+    
+    html_content += """
+        </div>
+    </body>
+    </html>
+    """
+    return html_content
+
 # --- FUNÇÕES AUXILIARES ---
 def add_student(name, group, gender):
-    """Adiciona um novo aluno à lista de alunos no estado da sessão."""
     if name:
         if any(student['name'].lower() == name.lower() for student in st.session_state.students):
             st.sidebar.warning(f"O aluno '{name}' já está na lista.")
@@ -39,7 +116,6 @@ def add_student(name, group, gender):
         st.sidebar.error("Por favor, insira o nome do aluno.")
 
 def clear_students():
-    """Limpa a lista de todos os alunos."""
     st.session_state.students = []
     st.session_state.map_generated = False
 
@@ -87,7 +163,7 @@ if st.button("✨ Gerar / Organizar Ensalamento", type="primary", use_container_
 
 if st.session_state.map_generated:
     st.subheader("Aqui está a turma organizada por grupos!")
-    # A visualização do mapa na tela continua a mesma
+    # A visualização na tela continua a mesma
     st.markdown('<div id="classroom-map" style="background-color: white; padding: 20px; border-radius: 10px;">', unsafe_allow_html=True)
     main_cols = st.columns(2, gap="large")
     for i, (group_id, group_info_config) in enumerate(GROUP_CONFIG.items()):
@@ -110,6 +186,19 @@ if st.session_state.map_generated:
                                 st.markdown(f'<div style="background-color: {group_info["color"]}; border-radius: 8px; padding: 15px 10px; text-align: center; color: white; font-family: sans-serif; min-height: 120px; display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-top: 15px solid rgba(0,0,0,0.2); margin-bottom: 10px;"><p style="font-size: 2.5em; margin: 0; line-height: 1;">{student_emoji}</p><h6 style="margin-top: 5px; margin-bottom: 0px; font-weight: bold; word-wrap: break-word;">{student["name"]}</h6></div>', unsafe_allow_html=True)
                 st.markdown("<br>", unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
+    st.divider()
+
+    # --- LÓGICA DE DOWNLOAD DE HTML ---
+    html_data = create_html_report(st.session_state.students)
+    
+    st.download_button(
+        label="📄 Baixar Relatório de Grupos (HTML)",
+        data=html_data,
+        file_name="relatorio_de_grupos.html",
+        mime="text/html",
+        use_container_width=True,
+        type="primary"
+    )
 
 else:
     st.info("Clique no botão 'Gerar Ensalamento' para visualizar o mapa.")
