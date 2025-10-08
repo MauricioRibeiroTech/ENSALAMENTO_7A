@@ -28,10 +28,11 @@ if 'map_generated' not in st.session_state:
 # --- FUNÇÃO DE GERAÇÃO DE HTML ---
 def create_html_report(students_list):
     """
-    Gera um relatório HTML elegante e imprimível com a lista de alunos por grupo.
-    Este método é robusto e não depende de bibliotecas externas complexas.
+    Gera um relatório HTML elegante e imprimível com os cards dos alunos por grupo,
+    replicando a visualização da tela.
     """
     
+    # CSS aprimorado para estilizar os cards e o layout
     html_content = """
     <!DOCTYPE html>
     <html lang="pt-BR">
@@ -40,68 +41,91 @@ def create_html_report(students_list):
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Relatório de Grupos</title>
         <style>
-            body {
-                font-family: sans-serif;
-                margin: 40px;
-                color: #333;
-            }
-            .container {
-                max-width: 800px;
-                margin: auto;
-                border: 1px solid #ddd;
-                padding: 30px;
+            body { font-family: sans-serif; margin: 20px; color: #333; }
+            .container { max-width: 1100px; margin: auto; }
+            h1 { text-align: center; color: #4a4a4a; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; margin-bottom: 30px;}
+            .grid-container { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+            .group-title { font-size: 1.5em; font-weight: bold; margin-bottom: 15px; }
+            .cards-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
+            .card {
                 border-radius: 8px;
-            }
-            h1 {
+                padding: 15px 10px;
                 text-align: center;
-                color: #4a4a4a;
-                border-bottom: 2px solid #f0f0f0;
-                padding-bottom: 10px;
+                color: white;
+                min-height: 120px;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                border-top: 15px solid rgba(0,0,0,0.2);
             }
-            h2 {
-                color: #0056b3;
-                margin-top: 40px;
-            }
-            ul {
-                list-style-type: none;
-                padding-left: 0;
-            }
-            li {
-                background-color: #f9f9f9;
-                border: 1px solid #eee;
-                border-radius: 4px;
-                padding: 10px 15px;
-                margin-bottom: 8px;
-                font-size: 16px;
+            .card p { font-size: 2.5em; margin: 0; line-height: 1; }
+            .card h6 { margin-top: 5px; margin-bottom: 0px; font-weight: bold; font-size: 1em; word-wrap: break-word; }
+            @media print {
+                body { margin: 0; }
+                .container { border: none; }
+                .grid-container { display: block; } /* Colunas empilhadas na impressão */
+                .column { page-break-inside: avoid; }
             }
         </style>
     </head>
     <body>
         <div class="container">
             <h1>Relatório de Grupos - 7º Ano A do HD</h1>
+            <div class="grid-container">
+                <div class="column">
     """
 
-    for group_id, config in GROUP_CONFIG.items():
+    # Coluna da Esquerda (Grupos 1, 3, 5)
+    for i in [1, 3, 5]:
+        group_id = i
+        config = GROUP_CONFIG[group_id]
         students_in_group = [s for s in students_list if s['group'] == group_id]
         
         if students_in_group:
-            # Título do Grupo
-            html_content += f"<h2>Grupo {group_id} {config['emoji']}</h2>"
-            html_content += "<ul>"
-            
-            # Lista de Alunos
+            html_content += f'<div class="group-title" style="color:{config["color"]};">{config["emoji"]} Grupo {group_id}</div>'
+            html_content += '<div class="cards-container">'
             for student in students_in_group:
                 student_emoji = "👦" if student['gender'] == "Menino" else "👧"
-                html_content += f"<li>{student_emoji} &nbsp; {student['name']}</li>"
-            
-            html_content += "</ul>"
-    
+                html_content += f'''
+                <div class="card" style="background-color: {config['color']};">
+                    <p>{student_emoji}</p>
+                    <h6>{student['name']}</h6>
+                </div>
+                '''
+            html_content += '</div><br>'
+
+    html_content += '</div><div class="column">'
+
+    # Coluna da Direita (Grupos 2, 4, 6)
+    for i in [2, 4, 6]:
+        group_id = i
+        config = GROUP_CONFIG[group_id]
+        students_in_group = [s for s in students_list if s['group'] == group_id]
+        
+        if students_in_group:
+            html_content += f'<div class="group-title" style="color:{config["color"]};">{config["emoji"]} Grupo {group_id}</div>'
+            html_content += '<div class="cards-container">'
+            for student in students_in_group:
+                student_emoji = "👦" if student['gender'] == "Menino" else "👧"
+                html_content += f'''
+                <div class="card" style="background-color: {config['color']};">
+                    <p>{student_emoji}</p>
+                    <h6>{student['name']}</h6>
+                </div>
+                '''
+            html_content += '</div><br>'
+
     html_content += """
+                </div>
+            </div>
         </div>
     </body>
     </html>
     """
     return html_content
+
 
 # --- FUNÇÕES AUXILIARES ---
 def add_student(name, group, gender):
